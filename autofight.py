@@ -2,8 +2,12 @@ import requests
 import time
 import sys
 import getpass
+import os
 
 API_URL = "https://leekwars.com/api"
+REQUEST_DELAY = 1
+FOLDER_SEPARATOR = "/"
+BACKUP_FOLDER = "./__backups__"
 
 # -------------------------------------------------------
 # Hyperlink formatting
@@ -146,6 +150,45 @@ def auto_composition_fight(session, compoid, amount, sorter):
         start_team_fight(session, compoid, best_id)
         time.sleep(1)
 
+# Backups
+
+def backup_farmer_ais(session):
+    response = session.get(f"{API_URL}/ai/get-farmer-ais").json()
+    folders = response["folders"]
+    folder_dict = {}
+    folder_path = {}
+    for folder in folders:
+        folder_dict[folder["id"]] = folder
+    for folder in folders:
+        _path = [folder["name"]]
+        _parent_id = folder["folder"]
+        while _parent_id != 0:
+            _parent = folder_dict[_parent_id]
+            _parent_id = _parent["folder"]
+            _path = [_parent["name"]] + _path
+        folder_path[folder["id"]] = BACKUP_FOLDER + FOLDER_SEPARATOR + FOLDER_SEPARATOR.join(_path)
+    folder_path[0] = BACKUP_FOLDER
+    for folder in folders:
+        _id = folder["id"]
+        backup_path = folder_path[_id]
+        if not os.path.exists(backup_path):
+            os.makedirs(backup_path)
+
+    ais = response["ais"]
+    L = len(ais)
+    i = 0
+    for _ai in ais:
+        time.sleep(REQUEST_DELAY)
+        print(f"backing up ais : {i}/{L}")
+        _id = _ai["id"]
+        _name = _ai["name"]
+        _folder = _ai["folder"]
+        _path = folder_path[_folder] + FOLDER_SEPARATOR + _name + ".leekscript"
+        code = session.get(f"{API_URL}/ai/get/{_id}").json()["ai"]["code"]
+        with open(_path, "w") as f:
+            f.write(code)
+        i+=1
+
 # -------------------------------------------------------
 # Program
 # -------------------------------------------------------
@@ -162,6 +205,9 @@ if __name__ == "__main__":
     print("Logged in as", format_farmer(session, farmer_id))
 
     print(f"{farmer_fights}+{team_fights} fights")
+
+    if input("Backup ais ? (y/n)") == "y":
+        backup_farmer_ais(session)
 
     leeks = list(farmer["leeks"].keys())
     leeks_profiles = [format_leek(session, leek_id) for leek_id in leeks]
