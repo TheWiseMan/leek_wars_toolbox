@@ -42,6 +42,7 @@ def format_farmer(session: requests.Session, farmer_id: str) -> str:
     farmer_talent = farmer["talent"]
     farmer_ranking = farmer["ranking"]
     name_formatted = format_hyperlink(farmer_url, farmer_name)
+    time.sleep(REQUEST_DELAY)
     return f"{name_formatted} - {farmer_level} ({farmer_talent} ^{farmer_ranking})"
 
 def format_leek(session: requests.Session, leek_id: str) -> str:
@@ -54,6 +55,7 @@ def format_leek(session: requests.Session, leek_id: str) -> str:
     leek_talent = leek["talent"]
     leek_ranking = leek["ranking"]
     name_formatted = format_hyperlink(leek_url, leek_name)
+    time.sleep(REQUEST_DELAY)
     return f"{name_formatted} - {leek_level} ({leek_talent} ^{leek_ranking})"
 
 def format_compo(session: requests.Session, compo_id: str) -> str:
@@ -67,6 +69,7 @@ def format_compo(session: requests.Session, compo_id: str) -> str:
     compo_talent = response["talent"]
     compo_leeks_n = len(response["leeks"])
     compo_level = response["total_level"]
+    time.sleep(REQUEST_DELAY)
     return f"{team_formatted}/{compo_name} - {compo_level}/{compo_leeks_n} ({compo_talent})"
 
 
