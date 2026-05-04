@@ -213,6 +213,7 @@ if __name__ == "__main__":
     if args.config:
         config = load_config(args.config)
         print(f"Loaded config from {args.config}")
+        print(f"{config}")
 
     # --- Credentials ---
     if "password" in config:
@@ -253,6 +254,7 @@ if __name__ == "__main__":
     for i, leek_id in enumerate(leeks):
         if i < len(config_leek_fights):
             count = config_leek_fights[i]
+            print(f"{leeks_profiles[i]}\t: {count}")
         else:
             count = int(input(f"{leeks_profiles[i]} fights\t: "))
         leek_fight_counts.append(count)
@@ -266,6 +268,7 @@ if __name__ == "__main__":
     for i, compo_id in enumerate(compositions):
         if i < len(config_compo_fights):
             count = config_compo_fights[i]
+            print(f"{compositions_profiles[i]}\t: {count}")
         else:
             count = int(input(f"{compositions_profiles[i]} fights\t: "))
         compo_fight_counts.append(count)
