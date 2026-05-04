@@ -3,6 +3,8 @@ import time
 import sys
 import getpass
 import os
+import json
+import argparse
 
 API_URL = "https://leekwars.com/api"
 REQUEST_DELAY = 1
@@ -10,19 +12,23 @@ FOLDER_SEPARATOR = "/"
 BACKUP_FOLDER = "./__backups__"
 
 # -------------------------------------------------------
+# Config loading
+# -------------------------------------------------------
+def load_config(path: str) -> dict:
+    with open(path, "r") as f:
+        return json.load(f)
+
+
+# -------------------------------------------------------
 # Hyperlink formatting
 # -------------------------------------------------------
 def format_hyperlink(uri: str, label: str | None = None) -> str:
-    # Fallback if Windows terminal doesn't support hyperlinks
     if sys.platform.startswith("win"):
         if label:
             return f"{label} ({uri})"
         return uri
-
-    # Modern hyperlink escape code
     if label:
         return f"\033]8;;{uri}\033\\{label}\033]8;;\033\\"
-
     return uri
 
 
@@ -37,7 +43,7 @@ def format_farmer(session: requests.Session, farmer_id: str) -> str:
     farmer_ranking = farmer["ranking"]
     name_formatted = format_hyperlink(farmer_url, farmer_name)
     return f"{name_formatted} - {farmer_level} ({farmer_talent} ^{farmer_ranking})"
-    
+
 def format_leek(session: requests.Session, leek_id: str) -> str:
     url = f"{API_URL}/leek/get/{leek_id}"
     response = session.get(url).json()
@@ -62,6 +68,7 @@ def format_compo(session: requests.Session, compo_id: str) -> str:
     compo_leeks_n = len(response["leeks"])
     compo_level = response["total_level"]
     return f"{team_formatted}/{compo_name} - {compo_level}/{compo_leeks_n} ({compo_talent})"
+
 
 # -------------------------------------------------------
 # Leek Wars API helpers
@@ -95,6 +102,7 @@ def start_team_fight(session: requests.Session, compoid: int, opponent: int):
     response.raise_for_status()
     return response.json()
 
+
 # -------------------------------------------------------
 # Automated fights
 # -------------------------------------------------------
@@ -109,7 +117,6 @@ def auto_farmer_fight(session, amount, sorter):
         best_id = best["id"]
 
         farmer_profile = format_farmer(session, best_id)
-
         print(f"Farmer fight {i+1}/{amount} {farmer_profile}")
 
         start_farmer_fight(session, best["id"])
@@ -127,7 +134,6 @@ def auto_leek_fight(session, leekid, amount, sorter):
         best_id = best["id"]
 
         leek_profile = format_leek(session, best_id)
-
         print(f"Leek fight {i+1}/{amount} {leek_profile}")
 
         start_solo_fight(session, leekid, best_id)
@@ -144,14 +150,15 @@ def auto_composition_fight(session, compoid, amount, sorter):
         best_id = best["id"]
 
         compo_profile = format_compo(session, best_id)
-
         print(f"Team fight {i+1}/{amount} {compo_profile}")
 
         start_team_fight(session, compoid, best_id)
         time.sleep(1)
 
-# Backups
 
+# -------------------------------------------------------
+# Backups
+# -------------------------------------------------------
 def backup_farmer_ais(session):
     response = session.get(f"{API_URL}/ai/get-farmer-ais").json()
     folders = response["folders"]
@@ -187,13 +194,30 @@ def backup_farmer_ais(session):
         code = session.get(f"{API_URL}/ai/get/{_id}").json()["ai"]["code"]
         with open(_path, "w") as f:
             f.write(code)
-        i+=1
+        i += 1
+
 
 # -------------------------------------------------------
 # Program
 # -------------------------------------------------------
 if __name__ == "__main__":
-    username = input("Username: ")
+    parser = argparse.ArgumentParser(description="LeekWars automation script")
+    parser.add_argument(
+        "config",
+        nargs="?",
+        help="Path to a JSON config file (optional; falls back to interactive prompts)"
+    )
+    args = parser.parse_args()
+
+    config = {}
+    if args.config:
+        config = load_config(args.config)
+        print(f"Loaded config from {args.config}")
+
+    # --- Credentials ---
+    if "password" in config:
+        print("Warning: 'password' found in config file and will be ignored. Passwords are always prompted.")
+    username = config.get("username") or input("Username: ")
     password = getpass.getpass("Password: ")
 
     session, data = get_session_token(username, password)
@@ -203,27 +227,50 @@ if __name__ == "__main__":
     team_fights = farmer["team_fights"]
 
     print("Logged in as", format_farmer(session, farmer_id))
-
     print(f"{farmer_fights}+{team_fights} fights")
 
-    if input("Backup ais ? (y/n)") == "y":
+    # --- Backup ---
+    if "backup_ais" in config:
+        do_backup = config["backup_ais"]
+    else:
+        do_backup = input("Backup ais ? (y/n) ") == "y"
+
+    if do_backup:
         backup_farmer_ais(session)
 
+    # --- Farmer fights ---
+    if "farmer_fights" in config:
+        farmer_fight_count = config["farmer_fights"]
+    else:
+        farmer_fight_count = int(input("Farmer fights: "))
+
+    # --- Leek fights ---
     leeks = list(farmer["leeks"].keys())
     leeks_profiles = [format_leek(session, leek_id) for leek_id in leeks]
 
-    farmer_fight_count = int(input("Farmer fights: "))
-    leek_fight_counts = [
-        int(input(f"{leeks_profiles[i]} fights\t: ")) for i in range(len(leeks))
-    ]
+    config_leek_fights = config.get("leek_fights", [])
+    leek_fight_counts = []
+    for i, leek_id in enumerate(leeks):
+        if i < len(config_leek_fights):
+            count = config_leek_fights[i]
+        else:
+            count = int(input(f"{leeks_profiles[i]} fights\t: "))
+        leek_fight_counts.append(count)
 
+    # --- Composition fights ---
     compositions = list(session.get(f"{API_URL}/team-composition/get-farmer-compositions").json().keys())
     compositions_profiles = [format_compo(session, compo_id) for compo_id in compositions]
-    compo_fight_counts = [
-        int(input(f"{compositions_profiles[i]} fights\t: ")) for i in range(len(compositions))
-    ]
-    
-    # Sort ascending on talent
+
+    config_compo_fights = config.get("compo_fights", [])
+    compo_fight_counts = []
+    for i, compo_id in enumerate(compositions):
+        if i < len(config_compo_fights):
+            count = config_compo_fights[i]
+        else:
+            count = int(input(f"{compositions_profiles[i]} fights\t: "))
+        compo_fight_counts.append(count)
+
+    # --- Run ---
     sorter = lambda arr: sorted(arr, key=lambda x: x["talent"])
 
     print("\t---------------")
