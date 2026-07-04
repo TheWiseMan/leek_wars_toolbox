@@ -5,6 +5,7 @@ import getpass
 import os
 import json
 import argparse
+import websocket
 
 API_URL = "https://leekwars.com/api"
 REQUEST_DELAY = 1
@@ -199,6 +200,21 @@ def backup_farmer_ais(session):
             f.write(code)
         i += 1
 
+def start_boss_fight(ws : websocket, leek_ids: list[int], boss: int):
+    # Create squad (boss_id: 1=Nasu, 2=Fennel, 3=Pumpkin)
+    ws.send(json.dumps([66, boss, True, leek_ids]))
+    w
+
+    # Wait for squad joined, then attack
+    while True:
+        data = json.loads(ws.recv())
+        if data[0] == 74:  # SQUAD_JOINED
+           ws.send(json.dumps([71]))  # ATTACK
+        elif data[0] == 78:  # STARTED
+           fight_id = data[1][0] if isinstance(data[1], list) else data[1]
+           print(f"Fight: https://leekwars.com/fight/{fight_id}")
+           break
+
 
 # -------------------------------------------------------
 # Program
@@ -225,10 +241,12 @@ if __name__ == "__main__":
     password = getpass.getpass("Password: ")
 
     session, data = get_session_token(username, password)
+    token = data["token"]
     farmer = data["farmer"]
     farmer_id = farmer["id"]
     farmer_fights = farmer["fights"]
     team_fights = farmer["team_fights"]
+    leeks = list(farmer["leeks"].keys())
 
     print("Logged in as", format_farmer(session, farmer_id))
     print(f"{farmer_fights}+{team_fights} fights")
@@ -247,9 +265,23 @@ if __name__ == "__main__":
         farmer_fight_count = config["farmer_fights"]
     else:
         farmer_fight_count = int(input("Farmer fights: "))
+    
+    # --- Boss fights ---
+    ws = websocket.create_connection(
+        "wss://leekwars.com/ws",
+        header=[f"Sec-WebSocket-Protocol: leek-wars, {token}"],
+    )
+    if "nasu_fights" in config:
+        nasu_fights = config.get("nasu_fights", 0)
+    else:
+        nasu_fights = int(input("Nasu fights: "))
+
+    if "fennel_fights" in config:
+        fennel_fights = config.get("fennel_fights", 0)
+    else:
+        fennel_fights = int(input("Fennel fights: "))
 
     # --- Leek fights ---
-    leeks = list(farmer["leeks"].keys())
     leeks_profiles = [format_leek(session, leek_id) for leek_id in leeks]
 
     config_leek_fights = config.get("leek_fights", [])
@@ -285,6 +317,13 @@ if __name__ == "__main__":
 
     for leek_id, count in zip(leeks, leek_fight_counts):
         auto_leek_fight(session, leek_id, count, sorter)
+    
+    for i in range(nasu_fights):
+        start_boss_fight(ws, 1, [int(l) for l in leeks])
+    
+    for i in range(fennel_fights):
+        start_boss_fight(ws, 2, [int(l) for l in leeks])
+    ws.close()
 
     for compo_id, count in zip(compositions, compo_fight_counts):
         auto_composition_fight(session, compo_id, count, sorter)

@@ -1,9 +1,9 @@
 {
   "username": "WiseMan",
   "backup_ais": false,
-  "farmer_fights": 10,
-  "leek_fights": [10, 10, 10, 0],
+  "farmer_fights": 0,
+  "leek_fights": [0, 0, 0, 0],
   "compo_fights": [10],
-  "nasu_fights": 0,
+  "nasu_fights": 50,
   "fennel_fights": 0
 }
