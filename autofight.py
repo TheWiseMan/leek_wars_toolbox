@@ -203,7 +203,6 @@ def backup_farmer_ais(session):
 def start_boss_fight(ws : websocket, leek_ids: list[int], boss: int):
     # Create squad (boss_id: 1=Nasu, 2=Fennel, 3=Pumpkin)
     ws.send(json.dumps([66, boss, True, leek_ids]))
-    w
 
     # Wait for squad joined, then attack
     while True:
