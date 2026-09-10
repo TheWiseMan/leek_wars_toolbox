@@ -1,8 +1,8 @@
 {
   "username": "UnWiseMan",
   "backup_ais": false,
-  "farmer_fights": 0,
-  "leek_fights": [25, 25, 0, 0],
+  "farmer_fights": 20,
+  "leek_fights": [10, 10, 10],
   "compo_fights": [0],
   "nasu_fights": 0,
   "fennel_fights": 0
